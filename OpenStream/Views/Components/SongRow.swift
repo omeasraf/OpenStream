@@ -1,5 +1,5 @@
 //
-//  OpenPlayerMiniView.swift
+//  SongRow.swift
 //  OpenStream
 //
 
@@ -10,44 +10,36 @@ import UIKit
 import AppKit
 #endif
 
-struct OpenPlayerMiniView: View {
-    var onExpand: () -> Void
-
-    private var playback: PlaybackController { PlaybackController.shared }
+struct SongRow: View {
+    let song: LibrarySong
+    let isCurrent: Bool
 
     var body: some View {
         HStack(spacing: 12) {
             artworkView
             VStack(alignment: .leading, spacing: 2) {
-                Text(playback.currentItem?.title ?? "OpenStream")
+                Text(song.title)
                     .font(.headline)
                     .lineLimit(1)
-                Text(playback.currentItem?.artist ?? "Tap a song to play")
-                    .font(.caption)
+                Text(song.artist)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button {
-                playback.playPause()
-            } label: {
-                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
+            if isCurrent {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.body)
+                    .foregroundStyle(.tint)
             }
-            .buttonStyle(.plain)
-            .disabled(playback.currentItem == nil)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .onTapGesture { onExpand() }
-        .shadow(radius: 6)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
     private var artworkView: some View {
         Group {
-            if let song = playback.currentItem, let data = song.artwork {
+            if let data = song.artwork {
                 #if os(iOS)
                 if let uiImage = UIImage(data: data) {
                     Image(uiImage: uiImage)
@@ -69,7 +61,7 @@ struct OpenPlayerMiniView: View {
                 placeholderArtwork
             }
         }
-        .frame(width: 44, height: 44)
+        .frame(width: 50, height: 50)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
@@ -78,8 +70,4 @@ struct OpenPlayerMiniView: View {
             .fill(.gray.opacity(0.3))
             .overlay(Image(systemName: "music.note").foregroundStyle(.secondary))
     }
-}
-
-#Preview {
-    OpenPlayerMiniView(onExpand: {})
 }

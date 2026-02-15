@@ -2,17 +2,35 @@
 //  HomeView.swift
 //  OpenStream
 //
-//  Created by Ome Asraf on 2/14/26.
-//
 
 import SwiftUI
 
 struct HomeView: View {
+    private var library: SongLibrary { SongLibrary.shared }
+    private var playback: PlaybackController { PlaybackController.shared }
+
     var body: some View {
-        VStack(spacing: 32) {
-            Image(systemName: "house.fill").font(.system(size: 48)).foregroundStyle(.secondary)
-            Text("Home").font(.largeTitle.bold())
-        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
+        Group {
+            if library.songs.isEmpty {
+                ContentUnavailableView(
+                    "No music yet",
+                    systemImage: "music.note.list",
+                    description: Text("Import songs in Settings to get started.")
+                )
+            } else {
+                List(library.songs) { song in
+                    SongRow(song: song, isCurrent: playback.currentItem?.id == song.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            playback.play(song)
+                        }
+                }
+                .listStyle(.inset)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
+        .navigationTitle("Home")
     }
 }
 

@@ -9,8 +9,9 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var isMiniPlayerExpanded = false
-    
+
     var body: some View {
         TabView {
             HomeView()
@@ -33,12 +34,27 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom) {
             OpenPlayerMiniView(onExpand: { isMiniPlayerExpanded = true })
                 .padding(.horizontal)
+            #if os(iOS)
                 .padding(.bottom, 60)
+            #else
+                .padding(.bottom, 5)
+            #endif
         }
         .ignoresSafeArea(.keyboard)
+        .onAppear {
+            if SongLibrary.shared.modelContext == nil {
+                SongLibrary.shared.setModelContext(modelContext)
+            }
+        }
+    #if os(iOS)
         .fullScreenCover(isPresented: $isMiniPlayerExpanded) {
             OpenPlayerView(isPresented: $isMiniPlayerExpanded)
         }
+    #else
+        .sheet(isPresented: $isMiniPlayerExpanded) {
+            OpenPlayerView(isPresented: $isMiniPlayerExpanded)
+        }
+    #endif
     }
 }
 
@@ -53,19 +69,31 @@ struct SearchView: View {
     }
 }
 struct LibraryView: View {
+    private var library: SongLibrary { SongLibrary.shared }
+    private var playback: PlaybackController { PlaybackController.shared }
+
     var body: some View {
-        VStack(spacing: 32) {
-            Image(systemName: "music.note.list").font(.system(size: 48)).foregroundStyle(.secondary)
-            Text("Library").font(.largeTitle.bold())
-        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
-    }
-}
-struct SettingsView: View {
-    var body: some View {
-        VStack(spacing: 32) {
-            Image(systemName: "gearshape").font(.system(size: 48)).foregroundStyle(.secondary)
-            Text("Settings").font(.largeTitle.bold())
-        }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
+        Group {
+            if library.songs.isEmpty {
+                ContentUnavailableView(
+                    "No music yet",
+                    systemImage: "music.note.list",
+                    description: Text("Import songs in Settings to get started.")
+                )
+            } else {
+                List(library.songs) { song in
+                    SongRow(song: song, isCurrent: playback.currentItem?.id == song.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            playback.play(song)
+                        }
+                }
+                .listStyle(.inset)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
+        .navigationTitle("Library")
     }
 }
 
