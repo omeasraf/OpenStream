@@ -30,6 +30,9 @@ struct OpenTabView: View {
                 SearchView()
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            IndexingStatusView()
+        }
         .ignoresSafeArea(.keyboard)
         .onAppear {
             if SongLibrary.shared.modelContext == nil {

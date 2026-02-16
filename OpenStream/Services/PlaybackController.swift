@@ -5,6 +5,8 @@
 
 import AVFoundation
 import Foundation
+import MediaPlayer
+import UIKit
 
 @Observable
 @MainActor
@@ -27,7 +29,88 @@ final class PlaybackController {
     /// True when the player is playing.
     private(set) var isPlaying: Bool = false
 
-    private init() {}
+    private init() {
+        setupRemoteCommands()
+    }
+
+    // MARK: - Remote Commands & Now Playing
+
+    private func setupRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        // Play command
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            self?.player?.play()
+            self?.isPlaying = true
+            self?.updateNowPlaying()
+            return .success
+        }
+
+        // Pause command
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.player?.pause()
+            self?.isPlaying = false
+            self?.updateNowPlaying()
+            return .success
+        }
+
+        // Skip forward (next track)
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            self?.playNext()
+            self?.updateNowPlaying()
+            return .success
+        }
+
+        // Skip backward (previous track)
+        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+            self?.playPrevious()
+            self?.updateNowPlaying()
+            return .success
+        }
+
+        // Seek forward/backward
+        commandCenter.skipForwardCommand.preferredIntervals = [15]
+        commandCenter.skipForwardCommand.addTarget { [weak self] event in
+            guard let self = self else { return .commandFailed }
+            let newTime = self.currentTime + 15
+            self.seek(to: newTime)
+            self.updateNowPlaying()
+            return .success
+        }
+
+        commandCenter.skipBackwardCommand.preferredIntervals = [15]
+        commandCenter.skipBackwardCommand.addTarget { [weak self] event in
+            guard let self = self else { return .commandFailed }
+            let newTime = max(0, self.currentTime - 15)
+            self.seek(to: newTime)
+            self.updateNowPlaying()
+            return .success
+        }
+    }
+
+    private func updateNowPlaying() {
+        guard let song = currentItem else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            return
+        }
+
+        var nowPlayingInfo: [String: Any] = [
+            MPMediaItemPropertyTitle: song.title,
+            MPMediaItemPropertyArtist: song.artist,
+            MPMediaItemPropertyAlbumTitle: song.album,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+        ]
+
+        // Add artwork if available
+        if let imageData = song.artwork, let image = UIImage(data: imageData) {
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        }
+
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+    }
 
     // MARK: - Audio session (iOS)
 
@@ -68,11 +151,13 @@ final class PlaybackController {
         player?.play()
         isPlaying = true
         observeDuration(from: item)
+        updateNowPlaying()
     }
 
     func pause() {
         player?.pause()
         isPlaying = false
+        updateNowPlaying()
     }
 
     func playPause() {
@@ -82,6 +167,7 @@ final class PlaybackController {
         } else {
             player?.play()
             isPlaying = true
+            updateNowPlaying()
         }
     }
 
@@ -90,6 +176,7 @@ final class PlaybackController {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
         currentTime = time
+        updateNowPlaying()
     }
 
     /// Play previous track in library order (by import date).
