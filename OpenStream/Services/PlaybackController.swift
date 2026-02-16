@@ -2,12 +2,9 @@
 //  PlaybackController.swift
 //  OpenStream
 //
-//  Shared playback state using AVPlayer. Drives mini player and full player UI.
-//  Designed for music now; can later support podcasts and audiobooks.
-//
 
-import Foundation
 import AVFoundation
+import Foundation
 
 @Observable
 @MainActor
@@ -37,13 +34,17 @@ final class PlaybackController {
     /// On iOS, AVPlayer has no sound until the audio session is set to playback.
     private func configureAudioSessionIfNeeded() {
         #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-            try session.setActive(true)
-        } catch {
-            // Session may already be configured; continue playback anyway
-        }
+            let session = AVAudioSession.sharedInstance()
+            do {
+                try session.setCategory(
+                    .playback,
+                    mode: .default,
+                    options: [.defaultToSpeaker, AVAudioSession.CategoryOptions.allowBluetoothHFP]
+                )
+                try session.setActive(true)
+            } catch {
+                // Session may already be configured; continue playback anyway
+            }
         #endif
     }
 
@@ -107,7 +108,8 @@ final class PlaybackController {
             if offset > 0 { isPlaying = false }
             return
         }
-        guard let index = songs.firstIndex(where: { $0.id == current.id }) else {
+        guard let index = songs.firstIndex(where: { $0.id == current.id })
+        else {
             if offset > 0 { isPlaying = false }
             return
         }
@@ -126,11 +128,13 @@ final class PlaybackController {
             player?.removeTimeObserver(observer)
         }
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+        // Use an inline @Sendable closure and hop to the MainActor for updates.
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main, using: { [weak self] time in
+            guard let self else { return }
             Task { @MainActor in
-                self?.currentTime = time.seconds
+                self.currentTime = time.seconds
             }
-        }
+        })
     }
 
     private func observeDuration(from item: AVPlayerItem) {
@@ -153,13 +157,17 @@ final class PlaybackController {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: nil,
             queue: .main
-        ) { [weak self] note in
-            Task { @MainActor in
-                guard let self,
-                      let ended = note.object as? AVPlayerItem,
-                      ended === self.player?.currentItem else { return }
-                self.playNext()
+        ) { note in
+            let ended = note.object as? AVPlayerItem
+            Task { @MainActor [weak self] in
+                guard let self = self,
+                      let ended
+                else { return }
+                if ended === self.player?.currentItem {
+                    self.playNext()
+                }
             }
         }
     }
 }
+

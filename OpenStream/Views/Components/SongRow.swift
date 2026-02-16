@@ -4,10 +4,11 @@
 //
 
 import SwiftUI
+
 #if os(iOS)
-import UIKit
+    import UIKit
 #elseif os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 struct SongRow: View {
@@ -41,21 +42,21 @@ struct SongRow: View {
         Group {
             if let data = song.artwork {
                 #if os(iOS)
-                if let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    placeholderArtwork
-                }
+                    if let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        placeholderArtwork
+                    }
                 #else
-                if let nsImage = NSImage(data: data) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    placeholderArtwork
-                }
+                    if let nsImage = NSImage(data: data) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        placeholderArtwork
+                    }
                 #endif
             } else {
                 placeholderArtwork
@@ -68,6 +69,8 @@ struct SongRow: View {
     private var placeholderArtwork: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(.gray.opacity(0.3))
-            .overlay(Image(systemName: "music.note").foregroundStyle(.secondary))
+            .overlay(
+                Image(systemName: "music.note").foregroundStyle(.secondary)
+            )
     }
 }

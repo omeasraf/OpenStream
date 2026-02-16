@@ -3,8 +3,8 @@
 //  OpenStream
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
@@ -48,7 +48,9 @@ struct SettingsView: View {
                     ContentUnavailableView(
                         "No songs yet",
                         systemImage: "music.note.list",
-                        description: Text("Tap \"Import Songs\" to add audio files from your device.")
+                        description: Text(
+                            "Tap \"Import Songs\" to add audio files from your device."
+                        )
                     )
                 } else {
                     ForEach(library.songs) { song in

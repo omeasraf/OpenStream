@@ -2,17 +2,14 @@
 //  SongLibraryService.swift
 //  OpenStream
 //
-//  Manages importing, persistence, and playback URLs for the song library.
-//  Metadata is extracted via AVFoundation (AudioMetadataExtractor); playback uses VLC.
-//
 
 import Foundation
 import SwiftData
 
 #if os(macOS)
-@preconcurrency import VLCKit
+    @preconcurrency import VLCKit
 #else
-import MobileVLCKit
+    import MobileVLCKit
 #endif
 
 // MARK: - SongLibrary
@@ -35,10 +32,17 @@ final class SongLibrary {
     }
 
     private init() {
-        let baseDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
+        let baseDir =
+            fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
-        songsDirectory = baseDir.appendingPathComponent("Songs", isDirectory: true)
-        try? fileManager.createDirectory(at: songsDirectory, withIntermediateDirectories: true)
+        songsDirectory = baseDir.appendingPathComponent(
+            "Songs",
+            isDirectory: true
+        )
+        try? fileManager.createDirectory(
+            at: songsDirectory,
+            withIntermediateDirectories: true
+        )
     }
 
     // MARK: - Public API
@@ -53,7 +57,10 @@ final class SongLibrary {
         var imported: [LibrarySong] = []
 
         for url in urls {
-            if let song = await importOneFile(from: url, modelContext: modelContext) {
+            if let song = await importFile(
+                from: url,
+                modelContext: modelContext
+            ) {
                 imported.append(song)
             }
         }
@@ -108,7 +115,9 @@ final class SongLibrary {
 
     // MARK: - Import (single file)
 
-    private func importOneFile(from url: URL, modelContext: ModelContext) async -> LibrarySong? {
+    private func importFile(from url: URL, modelContext: ModelContext) async
+        -> LibrarySong?
+    {
         let needsSecurityScope = url.startAccessingSecurityScopedResource()
         defer {
             if needsSecurityScope {
@@ -124,6 +133,7 @@ final class SongLibrary {
         }
 
         let fileHash = fileData.sha256()
+        let fileSize = fileData.count
 
         // Skip if already in library
         do {
@@ -137,7 +147,8 @@ final class SongLibrary {
             return nil
         }
 
-        let fileName = "song_\(UUID().uuidString.prefix(8))_\(url.lastPathComponent)"
+        let fileName =
+            "song_\(UUID().uuidString.prefix(8))_\(url.lastPathComponent)"
         let destinationURL = songsDirectory.appendingPathComponent(fileName)
 
         do {
@@ -146,13 +157,16 @@ final class SongLibrary {
             return nil
         }
 
-        let metadata = await AudioMetadataExtractor.extract(from: destinationURL)
+        let metadata = await AudioMetadataExtractor.extract(
+            from: destinationURL
+        )
 
         return LibrarySong(
             title: metadata.title,
             artist: metadata.artist,
             fileName: fileName,
             fileHash: fileHash,
+            size: fileSize,
             duration: metadata.duration,
             lyrics: metadata.lyrics,
             album: metadata.album,

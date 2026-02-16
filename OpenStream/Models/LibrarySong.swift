@@ -17,6 +17,7 @@ final class LibrarySong: Identifiable, Hashable {
     var fileName: String
     var fileHash: String
     var importedDate: Date
+    var size: Int
 
     // MARK: - Core display
     var title: String
@@ -42,6 +43,7 @@ final class LibrarySong: Identifiable, Hashable {
         artist: String,
         fileName: String,
         fileHash: String,
+        size: Int,
         duration: TimeInterval = 0,
         lyrics: String? = nil,
         album: String? = nil,
@@ -59,6 +61,7 @@ final class LibrarySong: Identifiable, Hashable {
         self.artist = artist
         self.fileName = fileName
         self.fileHash = fileHash
+        self.size = size
         self.importedDate = Date()
         self.duration = duration
         self.lyrics = lyrics

@@ -4,15 +4,14 @@
 //
 
 import SwiftUI
+
 #if os(iOS)
-import UIKit
+    import UIKit
 #elseif os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 struct OpenPlayerMiniView: View {
-    var onExpand: () -> Void
-
     private var playback: PlaybackController { PlaybackController.shared }
 
     var body: some View {
@@ -31,16 +30,20 @@ struct OpenPlayerMiniView: View {
             Button {
                 playback.playPause()
             } label: {
-                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
+                Image(
+                    systemName: playback.isPlaying ? "pause.fill" : "play.fill"
+                )
+                .font(.title2)
             }
             .buttonStyle(.plain)
             .disabled(playback.currentItem == nil)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .onTapGesture { onExpand() }
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
         .shadow(radius: 6)
     }
 
@@ -49,37 +52,39 @@ struct OpenPlayerMiniView: View {
         Group {
             if let song = playback.currentItem, let data = song.artwork {
                 #if os(iOS)
-                if let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    placeholderArtwork
-                }
+                    if let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        placeholderArtwork
+                    }
                 #else
-                if let nsImage = NSImage(data: data) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    placeholderArtwork
-                }
+                    if let nsImage = NSImage(data: data) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        placeholderArtwork
+                    }
                 #endif
             } else {
                 placeholderArtwork
             }
         }
-        .frame(width: 44, height: 44)
+        .frame(width: 35, height: 35)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private var placeholderArtwork: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(.gray.opacity(0.3))
-            .overlay(Image(systemName: "music.note").foregroundStyle(.secondary))
+            .overlay(
+                Image(systemName: "music.note").foregroundStyle(.secondary)
+            )
     }
 }
 
 #Preview {
-    OpenPlayerMiniView(onExpand: {})
+    OpenPlayerMiniView()
 }

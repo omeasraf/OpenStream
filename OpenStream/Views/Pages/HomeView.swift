@@ -15,15 +15,20 @@ struct HomeView: View {
                 ContentUnavailableView(
                     "No music yet",
                     systemImage: "music.note.list",
-                    description: Text("Import songs in Settings to get started.")
+                    description: Text(
+                        "Import songs in Settings to get started."
+                    )
                 )
             } else {
                 List(library.songs) { song in
-                    SongRow(song: song, isCurrent: playback.currentItem?.id == song.id)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            playback.play(song)
-                        }
+                    SongRow(
+                        song: song,
+                        isCurrent: playback.currentItem?.id == song.id
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        playback.play(song)
+                    }
                 }
                 .listStyle(.inset)
             }
