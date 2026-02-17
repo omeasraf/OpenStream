@@ -53,7 +53,7 @@ struct ContentView: View {
             }
         #else
             .sheet(isPresented: $isMiniPlayerExpanded) {
-                OpenPlayerView(isPresented: $isMiniPlayerExpanded)
+                OpenPlayerView()
             }
         #endif
         .onAppear {

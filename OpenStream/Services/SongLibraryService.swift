@@ -192,6 +192,23 @@ final class SongLibrary {
         return "\(nameWithoutExt) (\(UUID().uuidString.prefix(8)))\(ext)"
     }
 
+    /// Validates and repairs artwork paths. If a path is invalid, re-extracts and caches artwork.
+    /// Returns the valid path or nil if artwork cannot be obtained.
+    private func validateOrRepairArtworkPath(for song: LibrarySong, fileURL: URL) async -> String? {
+        // If path exists and file is accessible, return it
+        if let path = song.artworkPath, fileManager.fileExists(atPath: path) {
+            return path
+        }
+
+        // Path is missing or invalid, re-extract artwork from the audio file
+        let metadata = await AudioMetadataExtractor.extract(from: fileURL)
+        if let artworkData = metadata.artwork {
+            return cacheArtwork(artworkData)
+        }
+
+        return nil
+    }
+
     /// Gets the directory for an album (organized by artist/album or flat by album).
     private func getAlbumDirectory(
         album: String?,
@@ -224,7 +241,7 @@ final class SongLibrary {
             withIntermediateDirectories: true
         )
 
-        var descriptor = FetchDescriptor<LibrarySong>()
+        let descriptor = FetchDescriptor<LibrarySong>()
         let existingSongs: [LibrarySong]
         do {
             existingSongs = try modelContext.fetch(descriptor)
@@ -372,6 +389,27 @@ final class SongLibrary {
                 sortBy: [SortDescriptor(\.importedDate, order: .reverse)]
             )
             let fetched = try modelContext.fetch(descriptor)
+            
+            // Validate and repair artwork paths for all loaded songs
+            var songsToUpdate: [LibrarySong] = []
+            for song in fetched {
+                let fileURL = getFileURL(for: song)
+                if let validPath = await validateOrRepairArtworkPath(for: song, fileURL: fileURL) {
+                    if validPath != song.artworkPath {
+                        song.artworkPath = validPath
+                        songsToUpdate.append(song)
+                    }
+                } else if song.artworkPath != nil {
+                    song.artworkPath = nil
+                    songsToUpdate.append(song)
+                }
+            }
+            
+            // Save any updates
+            if !songsToUpdate.isEmpty {
+                saveContext()
+            }
+            
             songs = fetched
         } catch {
             songs = []
