@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var isPresentingFileImporter = false
     @State private var importError: String?
     @State private var isImporting = false
+    @State private var settings: AppSettings?
 
     private var library: SongLibrary { SongLibrary.shared }
 
@@ -40,6 +41,24 @@ struct SettingsView: View {
                 Section {
                     Text(error)
                         .foregroundStyle(.red)
+                }
+            }
+
+            // Library organization settings
+            if let settings = settings {
+                Section {
+                    Toggle("Group Songs by Album", isOn: Binding(
+                        get: { settings.groupSongsByAlbum },
+                        set: { newValue in
+                            settings.groupSongsByAlbum = newValue
+                            saveSettings()
+                        }
+                    ))
+                    .help("Organize songs into album folders when importing. Artwork is automatically extracted and cached.")
+                } header: {
+                    Text("Library Organization")
+                } footer: {
+                    Text("Enable to organize your library by album. Disable to keep all songs in the root directory.")
                 }
             }
 
@@ -81,7 +100,17 @@ struct SettingsView: View {
             if library.modelContext == nil {
                 library.setModelContext(modelContext)
             }
+            loadSettings()
         }
+    }
+
+    private func loadSettings() {
+        settings = AppSettings.getOrCreate(in: modelContext)
+    }
+
+    private func saveSettings() {
+        guard let settings = settings else { return }
+        try? modelContext.save()
     }
 
     private func handleFileImport(_ result: Result<[URL], Error>) async {

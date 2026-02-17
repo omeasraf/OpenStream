@@ -50,9 +50,10 @@ struct OpenPlayerMiniView: View {
     @ViewBuilder
     private var artworkView: some View {
         Group {
-            if let song = playback.currentItem, let data = song.artwork {
+            if let song = playback.currentItem, let artworkPath = song.artworkPath {
                 #if os(iOS)
-                    if let uiImage = UIImage(data: data) {
+                    if let imageData = try? Data(contentsOf: URL(fileURLWithPath: artworkPath)),
+                       let uiImage = UIImage(data: imageData) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -60,7 +61,8 @@ struct OpenPlayerMiniView: View {
                         placeholderArtwork
                     }
                 #else
-                    if let nsImage = NSImage(data: data) {
+                    if let imageData = try? Data(contentsOf: URL(fileURLWithPath: artworkPath)),
+                       let nsImage = NSImage(data: imageData) {
                         Image(nsImage: nsImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)

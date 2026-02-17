@@ -40,9 +40,9 @@ struct SongRow: View {
     @ViewBuilder
     private var artworkView: some View {
         Group {
-            if let data = song.artwork {
+            if let artworkPath = song.artworkPath {
                 #if os(iOS)
-                    if let uiImage = UIImage(data: data) {
+                    if let uiImage = UIImage(contentsOfFile: artworkPath) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -50,7 +50,7 @@ struct SongRow: View {
                         placeholderArtwork
                     }
                 #else
-                    if let nsImage = NSImage(data: data) {
+                    if let nsImage = NSImage(contentsOfFile: artworkPath) {
                         Image(nsImage: nsImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)

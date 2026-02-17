@@ -13,6 +13,7 @@ struct OpenStreamApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             LibrarySong.self,
+            AppSettings.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -125,7 +125,8 @@ struct OpenPlayerView: View {
     @ViewBuilder
     private var artworkView: some View {
         Group {
-            if let song = playback.currentItem, let data = song.artwork {
+            if let song = playback.currentItem, let path = song.artworkPath,
+               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
                 #if os(iOS)
                     if let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)

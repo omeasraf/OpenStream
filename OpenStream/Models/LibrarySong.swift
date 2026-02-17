@@ -35,8 +35,8 @@ final class LibrarySong: Identifiable, Hashable {
     var discNumber: Int?
     var year: Int?
     var composer: String?
-    /// Cover/artwork image data (JPEG/PNG)
-    var artwork: Data?
+    /// Path to artwork file (stored in global artwork cache)
+    var artworkPath: String?
 
     init(
         title: String,
@@ -54,7 +54,7 @@ final class LibrarySong: Identifiable, Hashable {
         discNumber: Int? = nil,
         year: Int? = nil,
         composer: String? = nil,
-        artwork: Data? = nil
+        artworkPath: String? = nil
     ) {
         self.id = UUID()
         self.title = title
@@ -73,7 +73,7 @@ final class LibrarySong: Identifiable, Hashable {
         self.discNumber = discNumber
         self.year = year
         self.composer = composer
-        self.artwork = artwork
+        self.artworkPath = artworkPath
     }
 
     static func == (lhs: LibrarySong, rhs: LibrarySong) -> Bool {

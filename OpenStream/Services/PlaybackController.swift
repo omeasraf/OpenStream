@@ -104,7 +104,7 @@ final class PlaybackController {
         ]
 
         // Add artwork if available
-        if let imageData = song.artwork, let image = UIImage(data: imageData) {
+        if let artworkPath = song.artworkPath, let image = UIImage(contentsOfFile: artworkPath) {
             let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
         }
