@@ -20,7 +20,6 @@ struct OpenPlayerView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            // Drag indicator with its own gesture for better hit area
             Capsule()
                 .fill(Color.secondary.opacity(0.4))
                 .frame(width: 36, height: 5)
@@ -29,22 +28,23 @@ struct OpenPlayerView: View {
                     Color.clear
                         .frame(width: 60, height: 30)
                         .contentShape(Rectangle())
-                        .gesture(dragGesture)
                 )
 
             Spacer()
 
-            artworkView
-                .frame(width: 300, height: 300)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .scaleEffect(
-                    isDragging ? max(0.9, 1.0 - (dragOffset / 1000)) : 1.0
-                )
+            //            artworkView
+            //                .frame(width: playback.isPlaying ? .infinity : 300, height: 300)
+            //                .clipShape(RoundedRectangle(cornerRadius: 16))
+            //                .scaleEffect(
+            //                    isDragging ? max(0.9, 1.0 - (dragOffset / 1000)) : 1.0
+            //                )
+
+            NowPlayingArtworkView(playback: playback)
 
             VStack(spacing: 4) {
                 Text(playback.currentItem?.title ?? "No track")
                     .font(.title2.bold())
-                Text(playback.currentItem?.artist ?? "—")
+                Text(playback.currentItem?.artist ?? "OpenStream")
                     .foregroundStyle(.secondary)
             }
 
@@ -93,70 +93,6 @@ struct OpenPlayerView: View {
             .interactiveSpring(response: 0.4, dampingFraction: 0.8),
             value: dragOffset
         )
-        .gesture(dragGesture)
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                isDragging = true
-                // Only allow dragging down
-                if value.translation.height > 0 {
-                    dragOffset = value.translation.height
-                }
-            }
-            .onEnded { value in
-                isDragging = false
-                // Dismiss if dragged down far enough or with enough velocity
-                if value.translation.height > 150
-                    || value.predictedEndTranslation.height > 200
-                {
-                    dismiss()
-                } else {
-                    // Spring back
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8))
-                    {
-                        dragOffset = 0
-                    }
-                }
-            }
-    }
-
-    @ViewBuilder
-    private var artworkView: some View {
-        Group {
-            if let song = playback.currentItem, let path = song.artworkPath,
-               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-                #if os(iOS)
-                    if let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        placeholderArtwork
-                    }
-                #else
-                    if let nsImage = NSImage(data: data) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        placeholderArtwork
-                    }
-                #endif
-            } else {
-                placeholderArtwork
-            }
-        }
-    }
-
-    private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(.gray.opacity(0.3))
-            .overlay(
-                Image(systemName: "music.note").font(.system(size: 80))
-                    .foregroundStyle(.secondary)
-            )
     }
 
     private var progressSection: some View {

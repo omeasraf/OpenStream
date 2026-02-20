@@ -21,6 +21,7 @@ final class SongLibrary {
 
     private let fileManager = FileManager.default
     private(set) var songs: [LibrarySong] = []
+    private(set) var albums: [Album] = []
     let songsDirectory: URL
     let artworkCacheDirectory: URL
 
@@ -74,7 +75,7 @@ final class SongLibrary {
     // MARK: - Artwork Caching
 
     /// Saves artwork data to the cache and returns the file path.
-    /// Uses hash of artwork data as the filename to avoid duplicates (Spotify-like approach).
+    /// Uses hash of artwork data as the filename to avoid duplicates.
     private func cacheArtwork(_ artworkData: Data) -> String? {
         guard !artworkData.isEmpty else { return nil }
 
@@ -127,39 +128,9 @@ final class SongLibrary {
         return "\(baseName).\(ext)"
     }
 
-    /// Saves metadata to JSON sidecar file next to the song.
-    /// Returns true if successful.
-    private func saveMetadataSidecar(for song: LibrarySong, at fileURL: URL) -> Bool {
-        let metadata = SongMetadata(from: song)
-        let sidecarURL = fileURL.appendingPathExtension("metadata.json")
 
-        do {
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            let jsonData = try encoder.encode(metadata)
-            try jsonData.write(to: sidecarURL)
-            return true
-        } catch {
-            return false
-        }
-    }
 
-    /// Loads metadata from JSON sidecar if it exists, otherwise returns nil.
-    private func loadMetadataSidecar(for fileName: String, in directory: URL) -> SongMetadata? {
-        let fileURL = directory.appendingPathComponent(fileName)
-        let sidecarURL = fileURL.appendingPathExtension("metadata.json")
 
-        guard fileManager.fileExists(atPath: sidecarURL.path) else { return nil }
-
-        do {
-            let jsonData = try Data(contentsOf: sidecarURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(SongMetadata.self, from: jsonData)
-        } catch {
-            return nil
-        }
-    }
 
     /// Gets or creates a unique filename if duplicates exist.
     private func getUniqueFileName(
@@ -224,6 +195,119 @@ final class SongLibrary {
         return songsDirectory.appendingPathComponent(albumDirName, isDirectory: true)
     }
 
+    // MARK: - Album Management
+
+    /// Gets an existing album or creates a new one if it doesn't exist.
+    /// Albums are uniquely identified by name + artist combination.
+    private func getOrCreateAlbum(
+        name: String?,
+        artist: String?,
+        year: Int?,
+        artworkPath: String?,
+        in modelContext: ModelContext
+    ) -> Album? {
+        guard let albumName = name, !albumName.isEmpty else { return nil }
+
+        let artistName = artist ?? "Unknown Artist"
+
+        // Try to find existing album
+        do {
+            var descriptor = FetchDescriptor<Album>(
+                predicate: #Predicate<Album> { $0.name == albumName && $0.artist == artistName }
+            )
+            descriptor.fetchLimit = 1
+            if let existingAlbum = try modelContext.fetch(descriptor).first {
+                // Update artwork if the existing album doesn't have one but we do
+                if existingAlbum.artworkPath == nil, let newArtworkPath = artworkPath {
+                    existingAlbum.artworkPath = newArtworkPath
+                }
+                return existingAlbum
+            }
+        } catch {
+            return nil
+        }
+
+        // Create new album
+        let album = Album(
+            name: albumName,
+            artist: artistName,
+            year: year,
+            artworkPath: artworkPath
+        )
+        modelContext.insert(album)
+        return album
+    }
+
+    /// Loads all albums from the database, sorted by name.
+    private func loadAlbums() async {
+        guard let modelContext = modelContext else { return }
+
+        do {
+            let descriptor = FetchDescriptor<Album>(
+                sortBy: [SortDescriptor(\.name, order: .forward)]
+            )
+            albums = try modelContext.fetch(descriptor)
+
+            // Reconstruct album-song relationships from songs' albumReference
+            var albumsNeedingSave = false
+            for song in songs {
+                if let albumRef = song.albumReference {
+                    // Find the corresponding album and ensure song is in its list
+                    if let albumIndex = albums.firstIndex(where: { $0.id == albumRef.id }) {
+                        let album = albums[albumIndex]
+                        if !album.songs.contains(where: { $0.id == song.id }) {
+                            album.songs.append(song)
+                            albumsNeedingSave = true
+                        }
+                        
+                        // Ensure album has artwork from song
+                        if album.artworkPath == nil, let songArtwork = song.artworkPath {
+                            album.artworkPath = songArtwork
+                            albumsNeedingSave = true
+                        }
+                    }
+                }
+            }
+
+            // Create albums for songs that don't have an album reference yet but have album metadata
+            var newAlbums: [Album] = []
+            for song in songs {
+                if song.albumReference == nil, let albumName = song.album, !albumName.isEmpty {
+                    let artistName = song.albumArtist ?? song.artist
+                    
+                    // Check if we already have this album (either in loaded or newly created)
+                    let albumExists = albums.contains(where: { $0.name == albumName && $0.artist == artistName })
+                    let newAlbumExists = newAlbums.contains(where: { $0.name == albumName && $0.artist == artistName })
+                    
+                    if !albumExists && !newAlbumExists {
+                        let newAlbum = Album(
+                            name: albumName,
+                            artist: artistName,
+                            year: song.year,
+                            artworkPath: song.artworkPath
+                        )
+                        newAlbum.songs.append(song)
+                        song.albumReference = newAlbum
+                        newAlbums.append(newAlbum)
+                        modelContext.insert(newAlbum)
+                        albumsNeedingSave = true
+                    }
+                }
+            }
+
+            if !newAlbums.isEmpty {
+                albums.append(contentsOf: newAlbums)
+                albums.sort { $0.name < $1.name }
+            }
+
+            if albumsNeedingSave {
+                saveContext()
+            }
+        } catch {
+            albums = []
+        }
+    }
+
     // MARK: - Indexing
 
     /// Scans the Songs directory on startup and syncs with the database.
@@ -271,9 +355,7 @@ final class SongLibrary {
             let fileName = url.lastPathComponent
             if existingFileNames.contains(fileName) { continue }
 
-            if let song = await importFileInPlace(at: url, modelContext: modelContext) {
-                modelContext.insert(song)
-            }
+            _ = await importFileInPlace(at: url, modelContext: modelContext)
         }
 
         saveContext()
@@ -334,9 +416,7 @@ final class SongLibrary {
 
         guard !imported.isEmpty else { return }
 
-        for song in imported {
-            modelContext.insert(song)
-        }
+        // Songs are already inserted in their import methods, just save
         saveContext()
         await loadSongs()
     }
@@ -351,6 +431,17 @@ final class SongLibrary {
             groupByAlbum: settings.groupSongsByAlbum
         ).appendingPathComponent(song.fileName)
         try? fileManager.removeItem(at: fileURL)
+
+        // Remove song from its album
+        if let album = song.albumReference {
+            if let index = album.songs.firstIndex(where: { $0.id == song.id }) {
+                album.songs.remove(at: index)
+            }
+            // If album is empty, delete it
+            if album.songs.isEmpty {
+                modelContext.delete(album)
+            }
+        }
 
         modelContext.delete(song)
         saveContext()
@@ -414,6 +505,9 @@ final class SongLibrary {
         } catch {
             songs = []
         }
+
+        // Also load albums
+        await loadAlbums()
     }
 
     // MARK: - Import (single file)
@@ -450,7 +544,7 @@ final class SongLibrary {
         let metadata = await AudioMetadataExtractor.extract(from: url)
         let artworkPath = metadata.artwork.flatMap { cacheArtwork($0) }
 
-        return LibrarySong(
+        let song = LibrarySong(
             title: metadata.title,
             artist: metadata.artist,
             fileName: fileName,
@@ -468,6 +562,23 @@ final class SongLibrary {
             composer: metadata.composer,
             artworkPath: artworkPath
         )
+
+        // Insert song into context first, then link to album
+        modelContext.insert(song)
+
+        // Link to album
+        if let album = getOrCreateAlbum(
+            name: metadata.album,
+            artist: metadata.albumArtist ?? metadata.artist,
+            year: metadata.year,
+            artworkPath: artworkPath,
+            in: modelContext
+        ) {
+            song.albumReference = album
+            album.songs.append(song)
+        }
+
+        return song
     }
 
     /// Imports from an external URL (file importer), copies into songsDirectory.
@@ -559,9 +670,21 @@ final class SongLibrary {
             composer: metadata.composer,
             artworkPath: artworkPath
         )
-        
-        // Save metadata sidecar
-        _ = saveMetadataSidecar(for: song, at: destinationURL)
+
+        // Insert song into context first, then link to album
+        modelContext.insert(song)
+
+        // Link to album
+        if let album = getOrCreateAlbum(
+            name: metadata.album,
+            artist: metadata.albumArtist ?? metadata.artist,
+            year: metadata.year,
+            artworkPath: artworkPath,
+            in: modelContext
+        ) {
+            song.albumReference = album
+            album.songs.append(song)
+        }
         
         return song
     }

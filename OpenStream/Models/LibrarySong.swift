@@ -37,6 +37,8 @@ final class LibrarySong: Identifiable, Hashable {
     var composer: String?
     /// Path to artwork file (stored in global artwork cache)
     var artworkPath: String?
+    /// Reference to the Album this song belongs to (optional for backwards compatibility)
+    var albumReference: Album?
 
     init(
         title: String,
